@@ -9,6 +9,7 @@
 import Foundation
 
 
+
 let publicTag = "com.xxxg0001.RSA-sample.publicKey".dataUsingEncoding(String.defaultCStringEncoding(), allowLossyConversion: false)!
 let privateTag = "com.xxxg0001.RSA-sample.privateKey".dataUsingEncoding(String.defaultCStringEncoding(), allowLossyConversion: false)!
 
@@ -73,31 +74,46 @@ public func generateKeyPair() ->(SecKeyRef?, SecKeyRef?) {
 }
 
 public func decryptWithData(cipher :NSData, privateKey :SecKeyRef) -> NSData? {
-    var contentLen = SecKeyGetBlockSize(privateKey)
-    var content = [UInt8](count: Int(contentLen), repeatedValue: 0)
-    let status = SecKeyDecrypt(privateKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(cipher.bytes), UInt(cipher.length), &content, &contentLen)
-    if status != 0 {
-        println("SecKeyDecrypt fail, Error Code: \(status)")
-        return nil
+    var decryptedData = NSMutableData()
+    let blockSize = Int(SecKeyGetBlockSize(privateKey))
+    let blockCount = Int(ceil(Double(cipher.length) / Double(blockSize)))
+    for i in 0..<blockCount {
+        var contentLen = UInt(blockSize)
+        var content = [UInt8](count: Int(contentLen), repeatedValue: 0)
+        let bufferSize = min(blockSize,(cipher.length - i * blockSize))
+        let buffer = cipher.subdataWithRange(NSMakeRange(i*blockSize, bufferSize))
+        let status = SecKeyDecrypt(privateKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(buffer.bytes), UInt(buffer.length), &content, &contentLen)
+        if (status == noErr){
+            decryptedData.appendBytes(content, length: Int(contentLen))
+        }else{
+            println("SecKeyDecrypt fail. Error Code: \(status)")
+            return nil
+        }
     }
-    return NSData(bytes: content, length: Int(contentLen))
+    return decryptedData
     
 }
 
 public func encryptWithData(content :NSData, publicKey :SecKeyRef) -> NSData? {
-    var cipherLen = SecKeyGetBlockSize(publicKey)
-    let maxPlainLen = Int(cipherLen - 12);
-    if (content.length > maxPlainLen) {
-        println("content(\(content.length)) is too long, must < \(maxPlainLen)")
-        return nil
+    
+    let blockSize = Int(SecKeyGetBlockSize(publicKey) - 11)
+    var encryptedData = NSMutableData()
+    let blockCount = Int(ceil(Double(content.length) / Double(blockSize)))
+    
+    for i in 0..<blockCount {
+        var cipherLen = SecKeyGetBlockSize(publicKey)
+        var cipher = [UInt8](count: Int(cipherLen), repeatedValue: 0)
+        let bufferSize = min(blockSize,(content.length - i * blockSize))
+        var buffer = content.subdataWithRange(NSMakeRange(i*blockSize, bufferSize))
+        let status = SecKeyEncrypt(publicKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(buffer.bytes), UInt(buffer.length), &cipher, &cipherLen)
+        if (status == noErr){
+            encryptedData.appendBytes(cipher, length: Int(cipherLen))
+        }else{
+            println("SecKeyEncrypt fail. Error Code: \(status)")
+            return nil
+        }
     }
-    var cipher = [UInt8](count: 128*sizeof(UInt8), repeatedValue: 0)
-    let status = SecKeyEncrypt(publicKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(content.bytes), UInt(content.length), &cipher, &cipherLen)
-    if status != 0 {
-        println("SecKeyEncrypt fail. Error Code: \(status)")
-        return nil
-    }
-    return NSData(bytes: cipher, length: Int(cipherLen))
+    return encryptedData
 }
 
 func getPublicKeyBits(publicKey: SecKeyRef) -> NSData? {
@@ -160,6 +176,3 @@ public func encodePublicKeyForASN1(publicKey:SecKeyRef) -> NSData? {
     }
     return nil
 }
-
-
-

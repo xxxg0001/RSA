@@ -24,8 +24,26 @@ class RSA_sampleTests: XCTestCase {
     
     func testRSA() {
         // This is an example of a functional test case.
+        let (puk, prk) = generateKeyPair()
+        if puk == nil {
+            return
+        }
+        let pukASN1 = encodePublicKeyForASN1(puk!)
+        if pukASN1 == nil {
+            return
+        }
+        let pukBase64 = pukASN1!.base64EncodedDataWithOptions(NSDataBase64EncodingOptions.allZeros)
+        
+        let data = [
+            "account":"test10",
+            "password":"a",
+            "deviceId":"ffff",
+            "game":"jxex",
+            "key":NSString(data: pukBase64, encoding: NSASCIIStringEncoding)!
+        ]
+        let jsondata = NSJSONSerialization.dataWithJSONObject(data, options: nil, error: nil)!
         let (publicKey, privateKey) = generateKeyPair()
-        let content = "test message".dataUsingEncoding(NSUTF8StringEncoding, allowLossyConversion: false)!
+        let content = jsondata
         let cipher = encryptWithData(content, publicKey!)!
         let content2 = decryptWithData(cipher, privateKey!)!
         XCTAssert(content == content2, "Pass")
