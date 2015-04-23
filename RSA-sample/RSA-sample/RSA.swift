@@ -9,12 +9,11 @@
 import Foundation
 
 
-
 let publicTag = "com.xxxg0001.RSA-sample.publicKey".dataUsingEncoding(String.defaultCStringEncoding(), allowLossyConversion: false)!
 let privateTag = "com.xxxg0001.RSA-sample.privateKey".dataUsingEncoding(String.defaultCStringEncoding(), allowLossyConversion: false)!
 
-let kSecPrivateKeyAttrsValue = kSecPrivateKeyAttrs.takeUnretainedValue() as NSCopying
-let kSecPublicKeyAttrsValue = kSecPublicKeyAttrs.takeUnretainedValue() as NSCopying
+let kSecPrivateKeyAttrsValue = kSecPrivateKeyAttrs.takeUnretainedValue() as! NSCopying
+let kSecPublicKeyAttrsValue = kSecPublicKeyAttrs.takeUnretainedValue() as! NSCopying
 
 public func loadDER() -> SecKeyRef? {
     let file = NSBundle.mainBundle().pathForResource("public_key", ofType: "der")
@@ -28,7 +27,7 @@ public func loadDER() -> SecKeyRef? {
         println("Can not read from pub.der")
         return nil
     }
-    let certificate = SecCertificateCreateWithData(kCFAllocatorDefault, publicKeyFileContent  as CFData).takeUnretainedValue()
+    let certificate = SecCertificateCreateWithData(kCFAllocatorDefault, publicKeyFileContent  as! CFData).takeUnretainedValue()
     let policy = SecPolicyCreateBasicX509().takeUnretainedValue();
     var unmanagedTrust : Unmanaged<SecTrust>? = nil
     let status = SecTrustCreateWithCertificates(certificate, policy, &unmanagedTrust)
@@ -52,13 +51,13 @@ public func generateKeyPair() ->(SecKeyRef?, SecKeyRef?) {
     
     let size :CFNumberRef = 1024
     let NYES = NSNumber(bool: true)
-    keyPairAttr.setValue(kSecAttrKeyTypeRSA, forKey: kSecAttrKeyType)
-    keyPairAttr.setValue(size, forKey: kSecAttrKeySizeInBits)
+    keyPairAttr.setValue(kSecAttrKeyTypeRSA, forKey: kSecAttrKeyType as String)
+    keyPairAttr.setValue(size, forKey: kSecAttrKeySizeInBits as String)
     
-    privateKeyAttr.setValue(NYES, forKey: kSecAttrIsPermanent)
-    privateKeyAttr.setValue(privateTag, forKey: kSecAttrApplicationTag)
-    publicKeyAttr.setValue(NYES, forKey: kSecAttrIsPermanent)
-    publicKeyAttr.setValue(publicTag, forKey: kSecAttrApplicationTag)
+    privateKeyAttr.setValue(NYES, forKey: kSecAttrIsPermanent as String)
+    privateKeyAttr.setValue(privateTag, forKey: kSecAttrApplicationTag as String)
+    publicKeyAttr.setValue(NYES, forKey: kSecAttrIsPermanent as String)
+    publicKeyAttr.setValue(publicTag, forKey: kSecAttrApplicationTag as String)
     keyPairAttr.setObject(privateKeyAttr, forKey: kSecPrivateKeyAttrsValue)
     keyPairAttr.setObject(publicKeyAttr, forKey: kSecPublicKeyAttrsValue)
     
@@ -78,11 +77,11 @@ public func decryptWithData(cipher :NSData, privateKey :SecKeyRef) -> NSData? {
     let blockSize = Int(SecKeyGetBlockSize(privateKey))
     let blockCount = Int(ceil(Double(cipher.length) / Double(blockSize)))
     for i in 0..<blockCount {
-        var contentLen = UInt(blockSize)
+        var contentLen = Int(blockSize)
         var content = [UInt8](count: Int(contentLen), repeatedValue: 0)
         let bufferSize = min(blockSize,(cipher.length - i * blockSize))
         let buffer = cipher.subdataWithRange(NSMakeRange(i*blockSize, bufferSize))
-        let status = SecKeyDecrypt(privateKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(buffer.bytes), UInt(buffer.length), &content, &contentLen)
+        let status = SecKeyDecrypt(privateKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(buffer.bytes), buffer.length, &content, &contentLen)
         if (status == noErr){
             decryptedData.appendBytes(content, length: Int(contentLen))
         }else{
@@ -99,13 +98,13 @@ public func encryptWithData(content :NSData, publicKey :SecKeyRef) -> NSData? {
     let blockSize = Int(SecKeyGetBlockSize(publicKey) - 11)
     var encryptedData = NSMutableData()
     let blockCount = Int(ceil(Double(content.length) / Double(blockSize)))
-    
+
     for i in 0..<blockCount {
         var cipherLen = SecKeyGetBlockSize(publicKey)
         var cipher = [UInt8](count: Int(cipherLen), repeatedValue: 0)
         let bufferSize = min(blockSize,(content.length - i * blockSize))
         var buffer = content.subdataWithRange(NSMakeRange(i*blockSize, bufferSize))
-        let status = SecKeyEncrypt(publicKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(buffer.bytes), UInt(buffer.length), &cipher, &cipherLen)
+        let status = SecKeyEncrypt(publicKey, SecPadding(kSecPaddingPKCS1), UnsafePointer<UInt8>(buffer.bytes), buffer.length, &cipher, &cipherLen)
         if (status == noErr){
             encryptedData.appendBytes(cipher, length: Int(cipherLen))
         }else{
@@ -118,12 +117,12 @@ public func encryptWithData(content :NSData, publicKey :SecKeyRef) -> NSData? {
 
 func getPublicKeyBits(publicKey: SecKeyRef) -> NSData? {
     let queryPublicKey = NSMutableDictionary()
-    queryPublicKey.setValue(kSecClassKey, forKey: kSecClass)
-    queryPublicKey.setValue(publicTag, forKey: kSecAttrApplicationTag)
-    queryPublicKey.setValue(kSecAttrKeyTypeRSA, forKey: kSecAttrKeyType)
+    queryPublicKey.setValue(kSecClassKey, forKey: kSecClass as String)
+    queryPublicKey.setValue(publicTag, forKey: kSecAttrApplicationTag as String)
+    queryPublicKey.setValue(kSecAttrKeyTypeRSA, forKey: kSecAttrKeyType as String)
     SecItemDelete(queryPublicKey)
-    queryPublicKey.setValue(publicKey, forKey: kSecValueRef)
-    queryPublicKey.setValue(NSNumber(bool: true), forKey: kSecReturnData)
+    queryPublicKey.setValue(publicKey, forKey: kSecValueRef as String)
+    queryPublicKey.setValue(NSNumber(bool: true), forKey: kSecReturnData as String)
     var publicKeyBits:Unmanaged<AnyObject>?
     let status = SecItemAdd(queryPublicKey, &publicKeyBits)
     if status != 0 {
@@ -139,7 +138,7 @@ func encodeLength(inout data:[UInt8], offset:Int, count:Int) -> Int {
         data[offset] = UInt8(length)
         return 1
     }
-    let i = UInt((length / 256) + 1)
+    let i = Int((length / 256) + 1)
     data[offset] = UInt8(i + 0x80)
     for j in 0..<i {
         data[i-j+offset] = UInt8(length & 0xFF)
@@ -176,3 +175,4 @@ public func encodePublicKeyForASN1(publicKey:SecKeyRef) -> NSData? {
     }
     return nil
 }
+
